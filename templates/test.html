@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Test - Acne Detection</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .upload-area { border: 2px dashed #ccc; padding: 40px; text-align: center; margin: 20px 0; }
+        .result { background: #f0f0f0; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        button { background: #2196f3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #1976d2; }
+        img { max-width: 300px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Acne Detection Test</h1>
+        
+        <div class="upload-area">
+            <h3>Upload an Image</h3>
+            <input type="file" id="fileInput" accept="image/*">
+            <br><br>
+            <button onclick="analyzeImage()">Analyze Image</button>
+        </div>
+        
+        <div id="imagePreview"></div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('imagePreview').innerHTML = 
+                        '<img src="' + e.target.result + '" alt="Preview">';
+                };
+                reader.readAsDataURL(selectedFile);
+            }
+        });
+        
+        async function analyzeImage() {
+            if (!selectedFile) {
+                alert('Please select an image first');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="result">Analyzing image...</div>';
+            
+            try {
+                // Convert file to base64
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const base64Data = e.target.result.split(',')[1];
+                    
+                    console.log('Sending request to debug endpoint first...');
+                    
+                    // First test with debug endpoint
+                    const debugResponse = await fetch('/debug-image', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ image_data: base64Data })
+                    });
+                    
+                    const debugResult = await debugResponse.json();
+                    console.log('Debug result:', debugResult);
+                    
+                    if (!debugResult.success) {
+                        resultDiv.innerHTML = `<div class="result error">Debug Error: ${debugResult.error}</div>`;
+                        return;
+                    }
+                    
+                    console.log('Debug successful, now sending to prediction API...');
+                    
+                    const response = await fetch('/api/predict', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ image_data: base64Data })
+                    });
+                    
+                    console.log('Response status:', response.status);
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('API Error:', errorText);
+                        resultDiv.innerHTML = `<div class="result error">Error: ${errorText}</div>`;
+                        return;
+                    }
+                    
+                    const result = await response.json();
+                    console.log('Result:', result);
+                    
+                    if (result.error) {
+                        resultDiv.innerHTML = `<div class="result error">Error: ${result.error}</div>`;
+                        return;
+                    }
+                    
+                    // Display results
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>Analysis Result</h3>
+                            <p><strong>Predicted Type:</strong> ${result.acne_info.name}</p>
+                            <p><strong>Confidence:</strong> ${(result.confidence * 100).toFixed(2)}%</p>
+                            <p><strong>Description:</strong> ${result.acne_info.description}</p>
+                            <p><strong>Severity:</strong> ${result.acne_info.severity}</p>
+                            <p><strong>Prevention:</strong> ${result.acne_info.prevention}</p>
+                            
+                            <h4>All Probabilities:</h4>
+                            <ul>
+                                ${Object.entries(result.probabilities)
+                                    .map(([type, prob]) => `<li>${type}: ${(prob * 100).toFixed(1)}%</li>`)
+                                    .join('')}
+                            </ul>
+                        </div>
+                    `;
+                };
+                reader.readAsDataURL(selectedFile);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `<div class="result error">Failed to analyze image: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
