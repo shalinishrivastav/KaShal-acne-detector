@@ -1,4 +1,4 @@
-# KaShal Acne Detectior
+# KaShal Acne Detector
 
 A Flask web application that uses a hybrid CNN-SVM model to classify different types of acne from skin images.
 
