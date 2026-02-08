@@ -1,4 +1,4 @@
-# CNN-SVM Hybrid Acne Detection App
+# KaShal Acne Detection App
 
 A Flask web application that uses a hybrid CNN-SVM model to classify different types of acne from skin images.
 
